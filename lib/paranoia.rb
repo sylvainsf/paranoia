@@ -144,20 +144,40 @@ class ActiveRecord::Base
     alias :destroy! :destroy
     alias :delete! :delete
     def really_destroy!
-      dependent_reflections = self.class.reflections.select do |name, reflection|
+      ActiveRecord::Base.transaction do
+        recursive_reflection_destruction(self, self)
+        touch_paranoia_column if ActiveRecord::VERSION::STRING >= "4.1"
+        self.reload
+        destroy!
+      end
+    end
+
+    def recursive_reflection_destruction(target=self, parent=nil)
+      dependent_reflections = target.class_eval("reflections").select do |name, reflection|
         reflection.options[:dependent] == :destroy
       end
       if dependent_reflections.any?
+        # Check for dependency chain
         dependent_reflections.each do |name, _|
-          associated_records = self.send(name)
+          associated_records = target.send(name)
           # Paranoid models will have this method, non-paranoid models will not
           associated_records = associated_records.with_deleted if associated_records.respond_to?(:with_deleted)
-          associated_records.each(&:really_destroy!)
-          self.send(name).reload
+          # has_one relationships return one object instead of an array.
+          unless associated_records.blank?
+            case associated_records.class.name
+            when "ActiveRecord::Associations::CollectionProxy"
+              associated_records.each { |ar| recursive_reflection_destruction(ar) } unless associated_records.empty?
+              associated_records.each(&:really_destroy!) unless associated_records.empty?
+            when "ActiveRecord::AssociationRelation"
+              associated_records.each { |ar| recursive_reflection_destruction(ar) } unless associated_records.empty?
+              associated_records.each(&:really_destroy!) unless associated_records.empty?
+            else
+              # has_one relationships will return the object instead of an array
+              associated_records.really_destroy!
+            end
+          end
         end
       end
-      touch_paranoia_column if ActiveRecord::VERSION::STRING >= "4.1"
-      destroy!
     end
 
     include Paranoia
