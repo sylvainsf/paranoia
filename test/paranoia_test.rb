@@ -18,6 +18,7 @@ ActiveRecord::Base.connection.execute 'CREATE TABLE plain_models (id INTEGER NOT
 ActiveRecord::Base.connection.execute 'CREATE TABLE callback_models (id INTEGER NOT NULL PRIMARY KEY, deleted_at DATETIME)'
 ActiveRecord::Base.connection.execute 'CREATE TABLE fail_callback_models (id INTEGER NOT NULL PRIMARY KEY, deleted_at DATETIME)'
 ActiveRecord::Base.connection.execute 'CREATE TABLE related_models (id INTEGER NOT NULL PRIMARY KEY, parent_model_id INTEGER NOT NULL, deleted_at DATETIME)'
+ActiveRecord::Base.connection.execute 'CREATE TABLE recursive_models (id INTEGER NOT NULL PRIMARY KEY, parent_model_id INTEGER, recursive_model_id INTEGER, deleted_at DATETIME)'
 ActiveRecord::Base.connection.execute 'CREATE TABLE employers (id INTEGER NOT NULL PRIMARY KEY, deleted_at DATETIME)'
 ActiveRecord::Base.connection.execute 'CREATE TABLE employees (id INTEGER NOT NULL PRIMARY KEY, deleted_at DATETIME)'
 ActiveRecord::Base.connection.execute 'CREATE TABLE jobs (id INTEGER NOT NULL PRIMARY KEY, employer_id INTEGER NOT NULL, employee_id INTEGER NOT NULL, deleted_at DATETIME)'
@@ -320,6 +321,16 @@ class ParanoiaTest < test_framework
     assert RelatedModel.unscoped.exists?(child_2.id)
   end
 
+  def test_real_destroy_dependent_destroy_with_recursive_dependent_destroy
+    parent_1 = ParentModel.create
+    child_1 = parent_1.recursive_destroy_models.create
+    child_2 = child_1.recursive_destroy_models.create
+
+    parent_1.destroy
+    parent_1.really_destroy!
+    refute RelatedModel.unscoped.exists?(child_2.id)
+  end
+
   if ActiveRecord::VERSION::STRING < "4.1"
     def test_real_destroy
       model = ParanoidModel.new
@@ -526,12 +537,20 @@ class ParentModel < ActiveRecord::Base
   has_many :paranoid_models
   has_many :related_models
   has_many :very_related_models, :class_name => 'RelatedModel', dependent: :destroy
+  has_many :recursive_destroy_models, :class_name => 'RecursiveModel', dependent: :destroy
   has_many :non_paranoid_models, dependent: :destroy
 end
 
 class RelatedModel < ActiveRecord::Base
   acts_as_paranoid
   belongs_to :parent_model
+end
+
+class RecursiveModel < ActiveRecord::Base
+  acts_as_paranoid
+  has_many :recursive_destroy_models, :class_name => 'RecursiveModel', dependent: :destroy
+  belongs_to :parent_model
+  belongs_to :recursive_destroy_parent, :class_name => 'RecursiveModel'
 end
 
 class Employer < ActiveRecord::Base
