@@ -145,14 +145,14 @@ class ActiveRecord::Base
     alias :delete! :delete
     def really_destroy!
       ActiveRecord::Base.transaction do
-        recursive_reflection_destruction(self, self)
+        recursive_reflection_destruction
         touch_paranoia_column if ActiveRecord::VERSION::STRING >= "4.1"
         self.reload
         destroy!
       end
     end
 
-    def recursive_reflection_destruction(target=self, parent=nil)
+    def recursive_reflection_destruction(target=self)
       dependent_reflections = target.class_eval("reflections").select do |name, reflection|
         reflection.options[:dependent] == :destroy
       end
