@@ -144,7 +144,12 @@ class ActiveRecord::Base
     alias :destroy! :destroy
     alias :delete! :delete
     def really_destroy!
+      # Wrapping everything in a transaction handles rollback properly when someone attempts to
+      # really_destroy an instrance that has delegated methods to a dependent: :destroy model without if guarding.
       ActiveRecord::Base.transaction do
+        # Separating the parent destroy from the recursive destroys solves the situation where calling really_destroy
+        # on a dependent polymorphic model would result in later really_destroy calls failing if another dependent
+        # model uses the same polymorphic model in a different way (acts_as_commentable is a good example.)
         recursive_reflection_destruction
         touch_paranoia_column if ActiveRecord::VERSION::STRING >= "4.1"
         self.reload
@@ -162,7 +167,6 @@ class ActiveRecord::Base
           associated_records = target.send(name)
           # Paranoid models will have this method, non-paranoid models will not
           associated_records = associated_records.with_deleted if associated_records.respond_to?(:with_deleted)
-          # has_one relationships return one object instead of an array.
           unless associated_records.blank?
             case associated_records.class.name
             when "ActiveRecord::Associations::CollectionProxy"
