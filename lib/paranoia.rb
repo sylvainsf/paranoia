@@ -119,26 +119,45 @@ module Paranoia
   # restore associated records that have been soft deleted when
   # we called #destroy
   def restore_associated_records
-    destroyed_associations = self.class.reflect_on_all_associations.select do |association|
-      association.options[:dependent] == :destroy
+    puts "restoring associated records"
+    destroyed_has_many_associations = self.class_eval("reflections").select do |name, reflection|
+      puts "gathering has_many"
+      reflection.options[:dependent] == :destroy
+      reflection.macro == :has_many
     end
 
-    destroyed_associations.each do |association|
-      association_data = send(association.name)
+    destroyed_has_one_associations = self.class_eval("reflections").select do |name, reflection|
+      puts "gathering has_one"
+      reflection.options[:dependent] == :destroy
+      reflection.macro == :has_one
+    end
 
-      unless association_data.nil?
+    destroyed_has_many_associations.each do |association|
+      association_data = send(association.name)
+      puts "has_many loop"
+
+      unless association_data.blank?
+        puts "data not blank"
         if association_data.paranoid?
-          case association.class.name
+          # Use explicit class names instead of .collection? method which throws exception on empty array
+          puts "data is paranoid"
+          case association_data.class.name
           when "ActiveRecord::Associations::CollectionProxy"
+            puts "proxy"
             association_data.only_deleted.each { |record| record.restore(:recursive => true) }
           when "ActiveRecord::AssociationRelation"
+            puts "relation"
             association_data.only_deleted.each { |record| record.restore(:recursive => true) }
-          else
-            # has_one relationships will return the object instead of a collection object
-            association_data.restore(:recursive => true)
           end
         end
       end
+    end
+
+    destroyed_has_one_associations.each do |association|
+      puts "has_one loop"
+      associated_record = send(association.name)
+      puts "restoring #{associated_record.class.name}"
+      associated_record.restore(recursive: true)
     end
   end
 end
