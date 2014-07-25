@@ -272,6 +272,7 @@ module Devise
     module Confirmable
       protected
         def reconfirmation_required?
+          puts "monkeypatch Devise"
           self.class.reconfirmable && @reconfirmation_required && self.email.present? && self.deleted_at.nil?
         end
     end
