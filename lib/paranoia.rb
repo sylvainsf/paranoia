@@ -137,6 +137,7 @@ module Paranoia
             # has_one relationships will return the object instead of a collection object
             association_data.restore(:recursive => true)
           end
+        end
       end
     end
   end
