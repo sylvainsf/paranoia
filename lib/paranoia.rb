@@ -23,6 +23,7 @@ module Paranoia
     alias :deleted :only_deleted
 
     def restore(id, opts = {})
+      puts "#{self.name} restore called"
       if id.is_a?(Array)
         id.map { |one_id| restore(one_id, opts) }
       else
