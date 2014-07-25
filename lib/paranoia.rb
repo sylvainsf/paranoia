@@ -262,3 +262,18 @@ class ActiveRecord::Base
 end
 
 require 'paranoia/rspec' if defined? RSpec
+
+# Fix devise to work with paranoia
+#
+
+
+module Devise
+  module Models
+    module Confirmable
+      protected
+        def reconfirmation_required?
+          self.class.reconfirmable && @reconfirmation_required && self.email.present? && self.deleted_at.nil?
+        end
+    end
+  end
+end
