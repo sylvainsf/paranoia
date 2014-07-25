@@ -275,6 +275,13 @@ module Devise
           puts "monkeypatch Devise"
           self.class.reconfirmable && @reconfirmation_required && self.email.present? && self.deleted_at.nil?
         end
+
+        def postpone_email_change?
+          puts "monkeypatch Devise"
+          postpone = self.class.reconfirmable && email_changed? && !@bypass_confirmation_postpone && self.email.present? && self.deleted_at.nil?
+          @bypass_confirmation_postpone = false
+          postpone
+        end
     end
   end
 end
