@@ -128,12 +128,15 @@ module Paranoia
 
       unless association_data.nil?
         if association_data.paranoid?
-          if association.collection?
+          case association.class.name
+          when "ActiveRecord::Associations::CollectionProxy"
+            association_data.only_deleted.each { |record| record.restore(:recursive => true) }
+          when "ActiveRecord::AssociationRelation"
             association_data.only_deleted.each { |record| record.restore(:recursive => true) }
           else
+            # has_one relationships will return the object instead of a collection object
             association_data.restore(:recursive => true)
           end
-        end
       end
     end
   end
